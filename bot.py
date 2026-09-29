@@ -37,8 +37,6 @@ User message: {user_text}
         "দুঃখিত 😔 এখন উত্তর দিতে পারছি না।"
     )
     
-    
-    
     = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(
