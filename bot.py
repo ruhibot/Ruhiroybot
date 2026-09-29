@@ -1,13 +1,15 @@
 import os
-import google.generativeai as genai
+from google import genai
+
 from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
+
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.8-flash")
+client = genai.Client(api_key=GEMINI_API_KEY)
+
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
@@ -22,13 +24,25 @@ User message: {user_text}
 """
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt
+        )
+
         await update.message.reply_text(response.text)
+
     except Exception:
-        await update.message.reply_text("দুঃখিত 😔 এখন উত্তর দিতে পারছি না।")
+        await update.message.reply_text(
+            "দুঃখিত 😔 এখন উত্তর দিতে পারছি না।"
+        )
+
 
 app = Application.builder().token(BOT_TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply))
+
+app.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, reply)
+)
 
 print("Ruhi AI Bot is online!")
+
 app.run_polling()
