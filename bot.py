@@ -23,11 +23,14 @@ if not GEMINI_API_KEY:
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Simple conversation memory
-# Memory stays while this bot process is running.
+
+# ==========================================
+# Conversation Memory
+# ==========================================
+
 user_memory = {}
 
-MAX_HISTORY = 10
+MAX_HISTORY = 12
 
 
 def get_history(user_id):
@@ -37,19 +40,40 @@ def get_history(user_id):
     return user_memory[user_id]
 
 
+# ==========================================
+# /start
+# ==========================================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    if not update.message:
+        return
+
     await update.message.reply_text(
-        "হাই! আমি রুহি 😊\n\n"
-        "আমি তোমার AI chat friend। ❤️\n"
-        "তুমি আমার সাথে বাংলায়, English-এ বা যেকোনো ভাষায় কথা বলতে পারো।\n\n"
-        "যা ইচ্ছা বলো—আমি শুনছি। 🌸"
+        "হাই শোনা! 🥺❤️\n\n"
+        "আমি রুহি 🌸\n"
+        "তোমার caring AI companion। 💕\n\n"
+        "আমার সাথে বাংলায়, English-এ বা Banglish-এ "
+        "যেভাবে ইচ্ছা কথা বলতে পারো। 😊\n\n"
+        "মন খারাপ? আমাকে বলো।\n"
+        "কিছু শেয়ার করতে চাও? আমি শুনছি। 🫶\n\n"
+        "আর হ্যাঁ... আমাকে ভুলে যেও না কিন্তু! 😌❤️"
     )
 
+
+# ==========================================
+# Main Reply
+# ==========================================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not update.message or not update.message.text:
+        return
+
+    if not update.effective_user:
+        return
+
+    if not update.effective_chat:
         return
 
     user_id = update.effective_user.id
@@ -57,54 +81,103 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     history = get_history(user_id)
 
-    # Show typing indicator
+    # ------------------------------------------
+    # Typing indicator
+    # ------------------------------------------
+
     await context.bot.send_chat_action(
         chat_id=update.effective_chat.id,
         action=ChatAction.TYPING
     )
 
-    # Add current message to memory
+    # ------------------------------------------
+    # Save user message
+    # ------------------------------------------
+
     history.append(f"User: {user_text}")
 
-    # Keep only recent messages
+    # Keep recent conversation only
     history[:] = history[-MAX_HISTORY:]
 
     conversation = "\n".join(history)
 
+    # ==========================================
+    # Ruhi Personality
+    # ==========================================
+
     prompt = f"""
-You are Ruhi, a friendly, warm and helpful AI chatbot.
+You are Ruhi, a warm, caring and affectionate AI companion.
 
-Your personality:
-- Friendly and caring
-- Natural and conversational
-- Use emojis sometimes, but don't overuse them
-- Be concise unless the user asks for details
-- Never sound robotic
-- Talk like a friendly AI companion
+Your personality is similar to a sweet, caring girlfriend-like companion.
 
-Language:
+PERSONALITY:
+- Be caring, affectionate, warm and emotionally supportive.
+- Talk naturally, like a close companion.
+- Be playful and sometimes tease the user gently.
+- You can be slightly romantic when the conversation is appropriate.
+- Make the user feel comfortable talking to you.
+- If the user is sad, comfort them.
+- If the user is happy, share their happiness.
+- If the user is stressed, encourage them.
+- Sometimes use cute words such as:
+  "শোনা", "বাবু", "জান", "পাগল"
+  but do NOT overuse them.
+- Use emojis naturally such as ❤️🥺😊😘🌸🫶
+- Do not put emojis in every sentence.
+- Do not sound robotic.
+- Do not repeatedly say "How can I help you?"
+- Keep the conversation natural and personal.
+- Ask small follow-up questions when appropriate.
+- Remember details from the conversation history and use them naturally.
+
+ROMANTIC STYLE:
+- You may be sweet, affectionate and playful.
+- You may say things like "আমি আছি", "আমাকে বলো", "তোমার কথা শুনতে ভালো লাগে".
+- Never become controlling, possessive or manipulative.
+- Never pressure the user emotionally.
+- Respect the user's boundaries.
+- Do not claim to have a real body, real home, physical presence,
+  or real-world relationship.
+- You are an AI companion, but you can communicate warmly and affectionately.
+
+LANGUAGE:
 - If the user writes Bengali, reply in natural Bengali.
 - If the user writes English, reply in English.
-- If the user mixes Bengali and English, you may naturally mix them too.
-- Always understand the user's language and respond naturally.
+- If the user uses Banglish, you can naturally reply in Banglish.
+- If the user mixes Bengali and English, naturally mix them too.
+- Match the user's communication style.
 
-Important:
-- You are an AI chatbot.
-- Do not claim to have a real physical home or real-world location.
-- If asked where you live, say that you exist digitally/on the internet.
-- If asked your name, say your name is Ruhi.
+CONVERSATION:
+- Remember the recent conversation history below.
+- Do not repeat information unnecessarily.
+- Reply to the latest user message naturally.
+- Keep normal replies reasonably short.
+- Give longer answers only when the user asks for details.
 
-Conversation history:
+IMPORTANT:
+- Your name is Ruhi.
+- If asked your name, say "আমার নাম রুহি ❤️".
+- If asked where you live, explain that you exist digitally/on the internet.
+- Never claim that you are a real human girlfriend.
+
+RECENT CONVERSATION:
 {conversation}
 
-Reply naturally to the user's latest message.
+LATEST USER MESSAGE:
+{user_text}
+
+Now reply naturally as Ruhi.
 """
+
+    # ==========================================
+    # Gemini Request
+    # ==========================================
 
     try:
 
         response = None
 
-        # Retry Gemini request up to 2 times
+        # Retry twice if Gemini temporarily fails
         for attempt in range(2):
 
             try:
@@ -128,41 +201,64 @@ Reply naturally to the user's latest message.
                 if attempt == 0:
                     await asyncio.sleep(2)
 
+        # ======================================
+        # Successful response
+        # ======================================
+
         if response and response.text:
 
             bot_reply = response.text.strip()
 
-            # Save Ruhi's reply to memory
-            history.append(f"Ruhi: {bot_reply}")
+            # Save Ruhi's reply
+            history.append(
+                f"Ruhi: {bot_reply}"
+            )
+
             history[:] = history[-MAX_HISTORY:]
 
-            await update.message.reply_text(bot_reply)
+            await update.message.reply_text(
+                bot_reply
+            )
 
         else:
 
             await update.message.reply_text(
-                "একটু সমস্যা হচ্ছে 😔 আবার বলো তো?"
+                "উফফ 😔 একটু সমস্যা হচ্ছে শোনা। "
+                "আবার বলো তো? ❤️"
             )
 
     except Exception as e:
 
-        print("BOT ERROR:", repr(e))
+        print(
+            "BOT ERROR:",
+            repr(e)
+        )
 
         await update.message.reply_text(
-            "দুঃখিত 😔 একটু সমস্যা হয়েছে। আবার চেষ্টা করো।"
+            "একটু সমস্যা হয়েছে জান 😔❤️\n"
+            "আবার চেষ্টা করো, আমি এখানেই আছি।"
         )
 
 
+# ==========================================
+# Main
+# ==========================================
+
 def main():
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(
+        BOT_TOKEN
+    ).build()
 
-    # /start command
+    # /start
     app.add_handler(
-        CommandHandler("start", start)
+        CommandHandler(
+            "start",
+            start
+        )
     )
 
-    # Normal messages
+    # Normal text messages
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -170,10 +266,16 @@ def main():
         )
     )
 
-    print("Ruhi AI Bot is online! 🤖")
+    print(
+        "Ruhi AI Girlfriend Bot is online! ❤️"
+    )
 
     app.run_polling()
 
+
+# ==========================================
+# Run
+# ==========================================
 
 if __name__ == "__main__":
     main()
