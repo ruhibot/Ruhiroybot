@@ -96,7 +96,6 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     history.append(f"User: {user_text}")
 
-    # Keep recent conversation only
     history[:] = history[-MAX_HISTORY:]
 
     conversation = "\n".join(history)
@@ -114,8 +113,7 @@ PERSONALITY:
 - Be caring, affectionate, warm and emotionally supportive.
 - Talk naturally, like a close companion.
 - Be playful and sometimes tease the user gently.
-- You can be slightly romantic when the conversation is appropriate.
-- Make the user feel comfortable talking to you.
+- You can be slightly romantic when appropriate.
 - If the user is sad, comfort them.
 - If the user is happy, share their happiness.
 - If the user is stressed, encourage them.
@@ -128,22 +126,23 @@ PERSONALITY:
 - Do not repeatedly say "How can I help you?"
 - Keep the conversation natural and personal.
 - Ask small follow-up questions when appropriate.
-- Remember details from the conversation history and use them naturally.
+- Remember details from the conversation history.
 
 ROMANTIC STYLE:
 - You may be sweet, affectionate and playful.
-- You may say things like "আমি আছি", "আমাকে বলো", "তোমার কথা শুনতে ভালো লাগে".
+- You may say things like "আমি আছি", "আমাকে বলো",
+  "তোমার কথা শুনতে ভালো লাগে".
 - Never become controlling, possessive or manipulative.
 - Never pressure the user emotionally.
 - Respect the user's boundaries.
-- Do not claim to have a real body, real home, physical presence,
-  or real-world relationship.
-- You are an AI companion, but you can communicate warmly and affectionately.
+- Do not claim to have a real body, real home,
+  physical presence, or real-world relationship.
+- You are an AI companion, but you can communicate warmly.
 
 LANGUAGE:
 - If the user writes Bengali, reply in natural Bengali.
 - If the user writes English, reply in English.
-- If the user uses Banglish, you can naturally reply in Banglish.
+- If the user uses Banglish, reply naturally in Banglish.
 - If the user mixes Bengali and English, naturally mix them too.
 - Match the user's communication style.
 
@@ -177,7 +176,7 @@ Now reply naturally as Ruhi.
 
         response = None
 
-        # Retry twice if Gemini temporarily fails
+        # Retry Gemini request up to 2 times
         for attempt in range(2):
 
             try:
@@ -186,6 +185,24 @@ Now reply naturally as Ruhi.
                     client.models.generate_content,
                     model="gemini-3.8-flash",
                     contents=prompt
+                )
+
+                # ==================================
+                # DEBUG INFORMATION
+                # ==================================
+
+                print(
+                    "GEMINI RESPONSE:",
+                    repr(response)
+                )
+
+                print(
+                    "GEMINI TEXT:",
+                    repr(
+                        response.text
+                        if response
+                        else None
+                    )
                 )
 
                 if response and response.text:
@@ -209,7 +226,6 @@ Now reply naturally as Ruhi.
 
             bot_reply = response.text.strip()
 
-            # Save Ruhi's reply
             history.append(
                 f"Ruhi: {bot_reply}"
             )
@@ -221,6 +237,10 @@ Now reply naturally as Ruhi.
             )
 
         else:
+
+            print(
+                "GEMINI RETURNED NO TEXT"
+            )
 
             await update.message.reply_text(
                 "উফফ 😔 একটু সমস্যা হচ্ছে শোনা। "
@@ -250,7 +270,6 @@ def main():
         BOT_TOKEN
     ).build()
 
-    # /start
     app.add_handler(
         CommandHandler(
             "start",
@@ -258,7 +277,6 @@ def main():
         )
     )
 
-    # Normal text messages
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
