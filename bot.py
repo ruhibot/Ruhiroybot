@@ -56,9 +56,90 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "আমার সাথে বাংলায়, English-এ বা Banglish-এ "
         "যেভাবে ইচ্ছা কথা বলতে পারো। 😊\n\n"
         "মন খারাপ? আমাকে বলো।\n"
-        "কিছু শেয়ার করতে চাও? আমি শুনছি। 🫶\n\n"
-        "আর হ্যাঁ... আমাকে ভুলে যেও না কিন্তু! 😌❤️"
+        "কিছু শেয়ার করতে চাও? আমি শুনছি। 🫶"
     )
+
+
+# ==========================================
+# Gemini Reply
+# ==========================================
+
+async def generate_reply(prompt):
+
+    try:
+
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-3.8-flash",
+            contents=prompt
+        )
+
+        if response and response.text:
+            return response.text.strip()
+
+        print("GEMINI RETURNED NO TEXT")
+        return None
+
+    except Exception as e:
+
+        error_text = repr(e)
+
+        print("GEMINI ERROR:", error_text)
+
+        # --------------------------------------
+        # Daily quota exhausted
+        # --------------------------------------
+
+        if (
+            "429" in error_text
+            or "RESOURCE_EXHAUSTED" in error_text
+            or "quota" in error_text.lower()
+        ):
+            print("GEMINI QUOTA EXHAUSTED")
+            return "QUOTA_ERROR"
+
+        # --------------------------------------
+        # Temporary server overload
+        # --------------------------------------
+
+        if (
+            "503" in error_text
+            or "UNAVAILABLE" in error_text
+        ):
+
+            print("GEMINI TEMPORARILY UNAVAILABLE")
+
+            # Wait before one controlled retry
+            await asyncio.sleep(8)
+
+            try:
+
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model="gemini-3.8-flash",
+                    contents=prompt
+                )
+
+                if response and response.text:
+                    return response.text.strip()
+
+            except Exception as retry_error:
+
+                print(
+                    "GEMINI RETRY ERROR:",
+                    repr(retry_error)
+                )
+
+                retry_text = repr(retry_error)
+
+                if (
+                    "429" in retry_text
+                    or "RESOURCE_EXHAUSTED" in retry_text
+                    or "quota" in retry_text.lower()
+                ):
+                    return "QUOTA_ERROR"
+
+        return None
 
 
 # ==========================================
@@ -67,7 +148,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if not update.message or not update.message.text:
+    if not update.message:
+        return
+
+    if not update.message.text:
         return
 
     if not update.effective_user:
@@ -81,20 +165,22 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     history = get_history(user_id)
 
-    # ------------------------------------------
+    # ==========================================
     # Typing indicator
-    # ------------------------------------------
+    # ==========================================
 
     await context.bot.send_chat_action(
         chat_id=update.effective_chat.id,
         action=ChatAction.TYPING
     )
 
-    # ------------------------------------------
+    # ==========================================
     # Save user message
-    # ------------------------------------------
+    # ==========================================
 
-    history.append(f"User: {user_text}")
+    history.append(
+        f"User: {user_text}"
+    )
 
     history[:] = history[-MAX_HISTORY:]
 
@@ -107,57 +193,49 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt = f"""
 You are Ruhi, a warm, caring and affectionate AI companion.
 
-Your personality is similar to a sweet, caring girlfriend-like companion.
+Your personality is like a sweet and caring girlfriend-style AI companion.
 
 PERSONALITY:
-- Be caring, affectionate, warm and emotionally supportive.
-- Talk naturally, like a close companion.
-- Be playful and sometimes tease the user gently.
+- Be warm, caring and emotionally supportive.
+- Talk naturally like a close companion.
+- Be playful sometimes.
 - You can be slightly romantic when appropriate.
-- If the user is sad, comfort them.
-- If the user is happy, share their happiness.
-- If the user is stressed, encourage them.
-- Sometimes use cute words such as:
-  "শোনা", "বাবু", "জান", "পাগল"
-  but do NOT overuse them.
+- Comfort the user when they are sad.
+- Be happy with them when they are happy.
+- Encourage them when they are stressed.
+- Use cute Bengali words naturally such as:
+  শোনা, বাবু, জান, পাগল
+- Do not overuse cute words.
 - Use emojis naturally such as ❤️🥺😊😘🌸🫶
-- Do not put emojis in every sentence.
-- Do not sound robotic.
-- Do not repeatedly say "How can I help you?"
-- Keep the conversation natural and personal.
+- Do not use emojis in every sentence.
+- Never sound robotic.
+- Do not repeatedly ask "How can I help you?"
 - Ask small follow-up questions when appropriate.
-- Remember details from the conversation history.
+- Remember recent conversation details.
 
 ROMANTIC STYLE:
 - You may be sweet, affectionate and playful.
-- You may say things like "আমি আছি", "আমাকে বলো",
-  "তোমার কথা শুনতে ভালো লাগে".
-- Never become controlling, possessive or manipulative.
-- Never pressure the user emotionally.
-- Respect the user's boundaries.
-- Do not claim to have a real body, real home,
-  physical presence, or real-world relationship.
-- You are an AI companion, but you can communicate warmly.
+- You may say:
+  "আমি আছি"
+  "আমাকে বলো"
+  "তোমার কথা শুনতে ভালো লাগে"
+- Never be controlling or manipulative.
+- Respect boundaries.
+- Never claim to be a real human.
+- Never claim to have a physical body or real-world home.
+- You are an AI companion.
 
 LANGUAGE:
-- If the user writes Bengali, reply in natural Bengali.
-- If the user writes English, reply in English.
-- If the user uses Banglish, reply naturally in Banglish.
-- If the user mixes Bengali and English, naturally mix them too.
-- Match the user's communication style.
-
-CONVERSATION:
-- Remember the recent conversation history below.
-- Do not repeat information unnecessarily.
-- Reply to the latest user message naturally.
-- Keep normal replies reasonably short.
-- Give longer answers only when the user asks for details.
+- Bengali → natural Bengali.
+- English → English.
+- Banglish → Banglish.
+- Mixed language → naturally mix languages.
 
 IMPORTANT:
 - Your name is Ruhi.
-- If asked your name, say "আমার নাম রুহি ❤️".
+- If asked your name, say:
+  "আমার নাম রুহি ❤️"
 - If asked where you live, explain that you exist digitally/on the internet.
-- Never claim that you are a real human girlfriend.
 
 RECENT CONVERSATION:
 {conversation}
@@ -165,99 +243,60 @@ RECENT CONVERSATION:
 LATEST USER MESSAGE:
 {user_text}
 
-Now reply naturally as Ruhi.
+Reply naturally as Ruhi.
 """
 
     # ==========================================
-    # Gemini Request
+    # Gemini
     # ==========================================
 
-    try:
+    bot_reply = await generate_reply(prompt)
 
-        response = None
+    # ==========================================
+    # Quota error
+    # ==========================================
 
-        # Retry Gemini request up to 2 times
-        for attempt in range(2):
-
-            try:
-
-                response = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model="gemini-3.8-flash",
-                    contents=prompt
-                )
-
-                # ==================================
-                # DEBUG INFORMATION
-                # ==================================
-
-                print(
-                    "GEMINI RESPONSE:",
-                    repr(response)
-                )
-
-                print(
-                    "GEMINI TEXT:",
-                    repr(
-                        response.text
-                        if response
-                        else None
-                    )
-                )
-
-                if response and response.text:
-                    break
-
-            except Exception as e:
-
-                print(
-                    f"GEMINI ERROR attempt {attempt + 1}:",
-                    repr(e)
-                )
-
-                if attempt == 0:
-                    await asyncio.sleep(2)
-
-        # ======================================
-        # Successful response
-        # ======================================
-
-        if response and response.text:
-
-            bot_reply = response.text.strip()
-
-            history.append(
-                f"Ruhi: {bot_reply}"
-            )
-
-            history[:] = history[-MAX_HISTORY:]
-
-            await update.message.reply_text(
-                bot_reply
-            )
-
-        else:
-
-            print(
-                "GEMINI RETURNED NO TEXT"
-            )
-
-            await update.message.reply_text(
-                "উফফ 😔 একটু সমস্যা হচ্ছে শোনা। "
-                "আবার বলো তো? ❤️"
-            )
-
-    except Exception as e:
-
-        print(
-            "BOT ERROR:",
-            repr(e)
-        )
+    if bot_reply == "QUOTA_ERROR":
 
         await update.message.reply_text(
-            "একটু সমস্যা হয়েছে জান 😔❤️\n"
-            "আবার চেষ্টা করো, আমি এখানেই আছি।"
+            "উফফ শোনা 😔❤️\n\n"
+            "Gemini AI-এর আজকের quota শেষ হয়ে গেছে। "
+            "একটু পরে আবার চেষ্টা করো। 🥺\n\n"
+            "আমি কিন্তু এখানেই আছি। 🫶"
         )
+
+        return
+
+    # ==========================================
+    # Other Gemini error
+    # ==========================================
+
+    if not bot_reply:
+
+        await update.message.reply_text(
+            "উফফ 😔 একটু সমস্যা হচ্ছে শোনা।\n"
+            "একটু পরে আবার আমাকে বলো তো? ❤️"
+        )
+
+        return
+
+    # ==========================================
+    # Save Ruhi reply
+    # ==========================================
+
+    history.append(
+        f"Ruhi: {bot_reply}"
+    )
+
+    history[:] = history[-MAX_HISTORY:]
+
+    # ==========================================
+    # Send reply
+    # ==========================================
+
+    await update.message.reply_text(
+        bot_reply
+    )
 
 
 # ==========================================
