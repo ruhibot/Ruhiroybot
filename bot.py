@@ -1,4 +1,4 @@
-    import os
+import os
 
 from google import genai
 from telegram import Update
@@ -9,25 +9,11 @@ from telegram.ext import (
     filters,
 )
 
-
-# =========================
-# Environment variables
-# =========================
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-
-# =========================
-# Gemini client
-# =========================
-
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-
-# =========================
-# Telegram reply function
-# =========================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -74,10 +60,6 @@ User message:
         )
 
 
-# =========================
-# Start Telegram bot
-# =========================
-
 def main():
 
     if not BOT_TOKEN:
@@ -99,10 +81,6 @@ def main():
 
     app.run_polling()
 
-
-# =========================
-# Run
-# =========================
 
 if __name__ == "__main__":
     main()
