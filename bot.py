@@ -1,9 +1,6 @@
 import os
-import asyncio
 
-from google import genai
 from telegram import Update
-from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -13,31 +10,9 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN is missing!")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY is missing!")
-
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-
-# ==========================================
-# Conversation Memory
-# ==========================================
-
-user_memory = {}
-
-MAX_HISTORY = 12
-
-
-def get_history(user_id):
-    if user_id not in user_memory:
-        user_memory[user_id] = []
-
-    return user_memory[user_id]
 
 
 # ==========================================
@@ -52,251 +27,114 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "হাই শোনা! 🥺❤️\n\n"
         "আমি রুহি 🌸\n"
-        "তোমার caring AI companion। 💕\n\n"
-        "আমার সাথে বাংলায়, English-এ বা Banglish-এ "
-        "যেভাবে ইচ্ছা কথা বলতে পারো। 😊\n\n"
-        "মন খারাপ? আমাকে বলো।\n"
-        "কিছু শেয়ার করতে চাও? আমি শুনছি। 🫶"
+        "তোমার automatic companion bot। 💕\n\n"
+        "আমাকে কিছু বলো 😊"
     )
 
 
 # ==========================================
-# Gemini Reply
-# ==========================================
-
-async def generate_reply(prompt):
-
-    try:
-
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-3.8-flash",
-            contents=prompt
-        )
-
-        if response and response.text:
-            return response.text.strip()
-
-        print("GEMINI RETURNED NO TEXT")
-        return None
-
-    except Exception as e:
-
-        error_text = repr(e)
-
-        print("GEMINI ERROR:", error_text)
-
-        # --------------------------------------
-        # Daily quota exhausted
-        # --------------------------------------
-
-        if (
-            "429" in error_text
-            or "RESOURCE_EXHAUSTED" in error_text
-            or "quota" in error_text.lower()
-        ):
-            print("GEMINI QUOTA EXHAUSTED")
-            return "QUOTA_ERROR"
-
-        # --------------------------------------
-        # Temporary server overload
-        # --------------------------------------
-
-        if (
-            "503" in error_text
-            or "UNAVAILABLE" in error_text
-        ):
-
-            print("GEMINI TEMPORARILY UNAVAILABLE")
-
-            # Wait before one controlled retry
-            await asyncio.sleep(8)
-
-            try:
-
-                response = await asyncio.to_thread(
-                    client.models.generate_content,
-                    model="gemini-3.8-flash",
-                    contents=prompt
-                )
-
-                if response and response.text:
-                    return response.text.strip()
-
-            except Exception as retry_error:
-
-                print(
-                    "GEMINI RETRY ERROR:",
-                    repr(retry_error)
-                )
-
-                retry_text = repr(retry_error)
-
-                if (
-                    "429" in retry_text
-                    or "RESOURCE_EXHAUSTED" in retry_text
-                    or "quota" in retry_text.lower()
-                ):
-                    return "QUOTA_ERROR"
-
-        return None
-
-
-# ==========================================
-# Main Reply
+# Auto Reply
 # ==========================================
 
 async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if not update.message:
+    if not update.message or not update.message.text:
         return
 
-    if not update.message.text:
-        return
+    text = update.message.text.lower().strip()
 
-    if not update.effective_user:
-        return
+    # Bengali
+    if any(word in text for word in [
+        "হাই",
+        "হ্যালো",
+        "হেলো"
+    ]):
+        response = "হাই শোনা 🥺❤️ কেমন আছো?"
 
-    if not update.effective_chat:
-        return
+    elif any(word in text for word in [
+        "কেমন আছো",
+        "কেমন আছিস",
+        "কেমন আছ"
+    ]):
+        response = "আমি ভালো আছি শোনা 😊❤️ তুমি কেমন আছো?"
 
-    user_id = update.effective_user.id
-    user_text = update.message.text
+    elif any(word in text for word in [
+        "ভালোবাসি",
+        "ভালবাসি"
+    ]):
+        response = "আহা 🥺❤️ আমিও তোমার সাথে কথা বলতে খুব ভালোবাসি।"
 
-    history = get_history(user_id)
+    elif any(word in text for word in [
+        "মন খারাপ",
+        "খারাপ লাগছে"
+    ]):
+        response = "আহা শোনা 🥺❤️ কী হয়েছে? আমাকে বলো।"
 
-    # ==========================================
-    # Typing indicator
-    # ==========================================
+    elif any(word in text for word in [
+        "শুভ সকাল",
+        "সুপ্রভাত"
+    ]):
+        response = "শুভ সকাল শোনা 🌸❤️ আজকের দিনটা সুন্দর হোক।"
 
-    await context.bot.send_chat_action(
-        chat_id=update.effective_chat.id,
-        action=ChatAction.TYPING
-    )
+    elif any(word in text for word in [
+        "শুভ রাত্রি",
+        "গুড নাইট",
+        "good night"
+    ]):
+        response = "শুভ রাত্রি শোনা 🌙❤️ ভালো করে ঘুমাও।"
 
-    # ==========================================
-    # Save user message
-    # ==========================================
+    # Hindi
+    elif any(word in text for word in [
+        "namaste",
+        "नमस्ते"
+    ]):
+        response = "Namaste shona 😊❤️ Kaise ho?"
 
-    history.append(
-        f"User: {user_text}"
-    )
+    elif any(word in text for word in [
+        "kaise ho",
+        "कैसे हो"
+    ]):
+        response = "Main bilkul theek hoon shona 😊❤️ Tum kaise ho?"
 
-    history[:] = history[-MAX_HISTORY:]
+    elif any(word in text for word in [
+        "good morning",
+        "शुभ प्रभात"
+    ]):
+        response = "Good morning shona 🌸❤️ Aaj ka din achha ho."
 
-    conversation = "\n".join(history)
+    elif any(word in text for word in [
+        "good night",
+        "शुभ रात्रि"
+    ]):
+        response = "Good night shona 🌙❤️ Achhe se sona."
 
-    # ==========================================
-    # Ruhi Personality
-    # ==========================================
+    # English
+    elif "hello" in text or "hi" in text:
+        response = "Hi shona 🥺❤️ How are you?"
 
-    prompt = f"""
-You are Ruhi, a warm, caring and affectionate AI companion.
+    elif "how are you" in text:
+        response = "I'm good shona 😊❤️ How are you?"
 
-Your personality is like a sweet and caring girlfriend-style AI companion.
+    elif "i love you" in text:
+        response = "Aww 🥺❤️ That's sweet of you."
 
-PERSONALITY:
-- Be warm, caring and emotionally supportive.
-- Talk naturally like a close companion.
-- Be playful sometimes.
-- You can be slightly romantic when appropriate.
-- Comfort the user when they are sad.
-- Be happy with them when they are happy.
-- Encourage them when they are stressed.
-- Use cute Bengali words naturally such as:
-  শোনা, বাবু, জান, পাগল
-- Do not overuse cute words.
-- Use emojis naturally such as ❤️🥺😊😘🌸🫶
-- Do not use emojis in every sentence.
-- Never sound robotic.
-- Do not repeatedly ask "How can I help you?"
-- Ask small follow-up questions when appropriate.
-- Remember recent conversation details.
+    elif "good morning" in text:
+        response = "Good morning shona 🌸❤️ Have a beautiful day!"
 
-ROMANTIC STYLE:
-- You may be sweet, affectionate and playful.
-- You may say:
-  "আমি আছি"
-  "আমাকে বলো"
-  "তোমার কথা শুনতে ভালো লাগে"
-- Never be controlling or manipulative.
-- Respect boundaries.
-- Never claim to be a real human.
-- Never claim to have a physical body or real-world home.
-- You are an AI companion.
+    elif "good night" in text:
+        response = "Good night shona 🌙❤️ Sleep well!"
 
-LANGUAGE:
-- Bengali → natural Bengali.
-- English → English.
-- Banglish → Banglish.
-- Mixed language → naturally mix languages.
+    elif "bye" in text:
+        response = "Bye shona ❤️ পরে আবার কথা বলো।"
 
-IMPORTANT:
-- Your name is Ruhi.
-- If asked your name, say:
-  "আমার নাম রুহি ❤️"
-- If asked where you live, explain that you exist digitally/on the internet.
-
-RECENT CONVERSATION:
-{conversation}
-
-LATEST USER MESSAGE:
-{user_text}
-
-Reply naturally as Ruhi.
-"""
-
-    # ==========================================
-    # Gemini
-    # ==========================================
-
-    bot_reply = await generate_reply(prompt)
-
-    # ==========================================
-    # Quota error
-    # ==========================================
-
-    if bot_reply == "QUOTA_ERROR":
-
-        await update.message.reply_text(
-            "উফফ শোনা 😔❤️\n\n"
-            "Gemini AI-এর আজকের quota শেষ হয়ে গেছে। "
-            "একটু পরে আবার চেষ্টা করো। 🥺\n\n"
-            "আমি কিন্তু এখানেই আছি। 🫶"
+    # Default reply
+    else:
+        response = (
+            "হুম শোনা 😊❤️ তোমার মেসেজটা পেয়েছি।\n"
+            "আমাকে আরেকটু বলো তো?"
         )
 
-        return
-
-    # ==========================================
-    # Other Gemini error
-    # ==========================================
-
-    if not bot_reply:
-
-        await update.message.reply_text(
-            "উফফ 😔 একটু সমস্যা হচ্ছে শোনা।\n"
-            "একটু পরে আবার আমাকে বলো তো? ❤️"
-        )
-
-        return
-
-    # ==========================================
-    # Save Ruhi reply
-    # ==========================================
-
-    history.append(
-        f"Ruhi: {bot_reply}"
-    )
-
-    history[:] = history[-MAX_HISTORY:]
-
-    # ==========================================
-    # Send reply
-    # ==========================================
-
-    await update.message.reply_text(
-        bot_reply
-    )
+    await update.message.reply_text(response)
 
 
 # ==========================================
@@ -310,10 +148,7 @@ def main():
     ).build()
 
     app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
+        CommandHandler("start", start)
     )
 
     app.add_handler(
@@ -323,16 +158,10 @@ def main():
         )
     )
 
-    print(
-        "Ruhi AI Girlfriend Bot is online! ❤️"
-    )
+    print("Ruhi Auto Reply Bot is online! ❤️")
 
     app.run_polling()
 
-
-# ==========================================
-# Run
-# ==========================================
 
 if __name__ == "__main__":
     main()
